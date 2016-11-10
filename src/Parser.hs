@@ -64,15 +64,15 @@ character = P f
 -- Parser that produces the given character but fails if
 --   * The input is empty.
 --   * The produced character is not equal to the given character.
-oneChar :: Char -> Parser Char
-oneChar c = satisfy (c ==)
+isChar :: Char -> Parser Char
+isChar c = satisfy (c ==)
 
 -- |
 -- Parser that produces a character between '0' and '9' but fails if
 --   * The input is empty.
 --   * The produced character is not a digit.
-oneDigit :: Parser Char
-oneDigit = satisfy isDigit
+digit :: Parser Char
+digit = satisfy isDigit
 
 -- |
 -- Parser that produces a space character but fails if
@@ -145,46 +145,58 @@ between :: Parser l -> Parser r -> Parser a -> Parser a
 between pl pr pa = pl *> pa <* pr
 
 -- |
--- Parser that matches a literal character.
--- A literal character is any escaped character '\x' or
--- any non-escaped character except '?', '*', '\' '['.
-literal :: Parser Matcher
-literal = (unescaped <|> escaped) >>= return . Literal
-  where
-    special = "?*\\["
-    unescaped = noneOf special
-    escaped = oneChar '\\' *> character
-
--- |
 -- Parser that applies the first parser as many times as possible
--- until the end parser succeeds
+-- until the end parser succeeds. The result of the end parser is discarded.
 manyTill
   :: Monoid a
   => Parser a -> Parser b -> Parser a
 manyTill pa pend = (pa <&> manyTill pa pend) <|> (pend >> constParser mempty)
 
 -- |
+-- Parser for a valid character inside a glob set
+setValid :: Parser Char
+setValid = (isChar '\\' *> isChar ']') <|> noneOf "]"
+
+-- |
+-- Parser that matches a literal character.
+-- A literal character is any escaped character '\x' or
+-- any non-escaped character except '?', '*', '\' '['.
+literal :: Parser MatcherType
+literal = (unescaped <|> escaped <|> slash) >>= return . Literal
+  where
+    special = "?*\\["
+    unescaped = noneOf special
+    escaped = isChar '\\' *> character
+    slash = isChar '\\'
+
+-- |
 -- Parser for a matcher that matches any string
-anyString :: Parser Matcher
-anyString = oneChar '*' >>= return . (const AnyString)
+anyString :: Parser MatcherType
+anyString = isChar '*' >>= return . (const AnyString)
 
 -- |
 -- Parser for a matcher that matches any one character
-anyChar :: Parser Matcher
-anyChar = oneChar '?' >>= return . (const AnyChar)
+anyChar :: Parser MatcherType
+anyChar = isChar '?' >>= return . (const AnyChar)
 
 -- |
 -- Parser for a range of characters
 charRange :: Parser String
 charRange = do
-  l <- character <* oneChar '-'
-  r <- character
+  l <- setValid <* isChar '-'
+  r <- setValid
   return (toEnum <$> [fromEnum l .. fromEnum r])
 
 -- |
 -- Parser for a set of characters
-charSet :: Parser Matcher
+charSet :: Parser MatcherType
 charSet = do
-  chars <- oneChar '[' *> manyTill p (oneChar ']')
+  chars <- between (isChar '[') (isChar ']') (p >>= return . concat)
   return (Set $ S.fromList chars)
-  where p = charRange <|> (character >>= return . pure)
+  where
+    p = many (charRange <|> (setValid >>= return . pure))
+
+-- |
+-- Parser for any combination of glob matchers
+matchers :: Parser [MatcherType]
+matchers = many (literal <|> anyString <|> anyChar <|> charSet)

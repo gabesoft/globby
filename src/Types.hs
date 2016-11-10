@@ -3,14 +3,28 @@ module Types where
 
 import qualified Data.Set as S
 
-data Matcher
+data MatcherType
   = Literal Char
   | AnyString
   | AnyChar
-  | Range Char
-          Char
   | Set (S.Set Char)
-  deriving (Eq, Show)
+  deriving (Eq)
+
+instance Show MatcherType where
+  show (Literal c) = escapeSpecial c
+  show AnyString = "*"
+  show AnyChar = "?"
+  show (Set s) = "[" ++ (concat $ escapeSetSpecial <$> S.toList s) ++ "]"
+
+escapeSpecial :: Char -> String
+escapeSpecial '*' = "\\*"
+escapeSpecial '?' = "\\?"
+escapeSpecial '[' = "\\["
+escapeSpecial c = [c]
+
+escapeSetSpecial :: Char -> String
+escapeSetSpecial ']' = "\\]"
+escapeSetSpecial c = [c]
 
 type Input = String
 
@@ -34,6 +48,11 @@ data ParseResult a
            a
   deriving (Eq)
 
+data MatcherResult =
+  MResult Input
+          Bool
+  deriving (Eq, Show)
+
 instance Show a =>
          Show (ParseResult a) where
   show (ErrorResult e) = show e
@@ -42,6 +61,20 @@ instance Show a =>
 data Parser a = P
   { parse :: Input -> ParseResult a
   }
+
+data Matcher = M
+  { match :: Input -> MatcherResult
+  }
+
+instance Monoid Matcher where
+  mempty = M (\xs -> MResult xs True)
+  mappend (M f) (M g) =
+    M
+      (\xs ->
+         let (MResult ys m) = f xs
+         in if m
+              then g ys
+              else MResult xs False)
 
 -- |
 -- Functor instance for a @Parser@.
@@ -75,7 +108,9 @@ bindParser f (P pa) = P g
 -- |
 -- Parser that applies the first parser and then the second and
 -- combines the results. An error is returned if any parser fails.
-(<&>) :: Monoid a => Parser a -> Parser a -> Parser a
+(<&>)
+  :: Monoid a
+  => Parser a -> Parser a -> Parser a
 (<&>) pa1 pa2 = do
   a1 <- pa1
   a2 <- pa2
@@ -94,4 +129,5 @@ bindParser f (P pa) = P g
         r -> r
 
 infixl 3 <|>
+
 infixl 4 <&>

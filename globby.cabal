@@ -3,7 +3,7 @@ version:             0.1.0.0
 synopsis:            Simple glob matcher
 description:         Please see README.md
 homepage:            https://github.com/gabesoft/globby#readme
-license:             MIT
+license:             BSD3
 license-file:        LICENSE
 author:              Author name here
 maintainer:          gabesoft@gmail.com
