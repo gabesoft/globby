@@ -36,6 +36,11 @@ main =
       isTrue "[a-c-z]" "-"
       isFalse "[a-c-z]" "d"
       isFalse "[z-a]" "d"
+      isTrue "/*/abc" "/xyz/abc"
+      isFalse "/*/abc" "/xyz/acc"
+      isFalse "/*/abc*k" "/xyz/acck"
+      isTrue "/*/abc*k" "/xyz/abck"
+      isTrue "/*/abc*k" "/xyz/abc123k"
 
 is :: Bool -> [Char] -> [Char] -> SpecWith ()
 is expected pat input = it (pat ++ sym ++ input) $ verify expected pat input

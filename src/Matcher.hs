@@ -1,14 +1,21 @@
 -- | Glob matcher
 module Matcher where
 
+import Data.List (tails)
 import qualified Data.Set as S
 import Types
 
-mfalse :: Input -> MatcherResult
-mfalse xs = MResult xs False
+mrFalse :: Input -> MatcherResult
+mrFalse xs = MResult [xs] False
 
-mtrue :: Input -> MatcherResult
-mtrue xs = MResult xs True
+mrTrue :: Input -> MatcherResult
+mrTrue xs = MResult [xs] True
+
+mFalse :: Matcher
+mFalse = M mrFalse
+
+mTrue :: Matcher
+mTrue = M mrTrue
 
 matchLiteral :: Char -> Matcher
 matchLiteral c = M f
@@ -16,26 +23,26 @@ matchLiteral c = M f
     f [] = MResult [] False
     f (x:xs) =
       if x == c
-        then mtrue xs
-        else mfalse (x : xs)
+        then mrTrue xs
+        else mrFalse (x : xs)
 
 matchAnyChar :: Matcher
 matchAnyChar = M f
   where
-    f [] = mfalse []
-    f (_:xs) = mtrue xs
+    f [] = mrFalse []
+    f (_:xs) = mrTrue xs
 
 matchSetChar :: S.Set Char -> Matcher
 matchSetChar s = M f
   where
-    f [] = mfalse []
+    f [] = mrFalse []
     f (x:xs) =
       if S.member x s
-        then mtrue xs
-        else mfalse (x : xs)
+        then mrTrue xs
+        else mrFalse (x : xs)
 
 matchAnyString :: Matcher
-matchAnyString = M (\_ -> mtrue [])
+matchAnyString = M (\xs -> MResult (tails xs) True)
 
 typeToMatcher :: MatcherType -> Matcher
 typeToMatcher (Literal c) = matchLiteral c
@@ -44,5 +51,5 @@ typeToMatcher AnyString = matchAnyString
 typeToMatcher AnyChar = matchAnyChar
 
 typesToMatcher :: [MatcherType] -> Matcher
-typesToMatcher [] = M (\x -> MResult x (null x))
+typesToMatcher [] = M (\x -> MResult [x] (null x))
 typesToMatcher xs = (foldr mappend mempty . fmap typeToMatcher) xs

@@ -1,6 +1,7 @@
 -- | Data types
 module Types where
 
+import Data.Monoid
 import qualified Data.Set as S
 
 data MatcherType
@@ -49,7 +50,7 @@ data ParseResult a
   deriving (Eq)
 
 data MatcherResult =
-  MResult Input
+  MResult [Input]
           Bool
   deriving (Eq, Show)
 
@@ -66,15 +67,19 @@ data Matcher = M
   { match :: Input -> MatcherResult
   }
 
+instance Monoid MatcherResult where
+  mempty = MResult [] False
+  mappend (MResult xs b1) (MResult ys b2) = MResult (xs <> ys) (b1 || b2)
+
 instance Monoid Matcher where
-  mempty = M (\xs -> MResult xs True)
+  mempty = M (\xs -> MResult [xs] True)
   mappend (M f) (M g) =
     M
       (\xs ->
          let (MResult ys m) = f xs
          in if m
-              then g ys
-              else MResult xs False)
+              then foldr mappend mempty (g <$> ys)
+              else MResult [xs] False)
 
 -- |
 -- Functor instance for a @Parser@.
