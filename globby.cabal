@@ -38,4 +38,4 @@ test-suite globby-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/globby
+  location: https://github.com/gabesoft/globby
